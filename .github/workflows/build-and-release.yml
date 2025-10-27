@@ -1,0 +1,79 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+      
+      - name: Restore NuGet packages
+        run: nuget restore Magnus.sln
+      
+      - name: Build solution
+        run: msbuild Magnus.sln /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath=../publish
+      
+      - name: Create release package
+        run: |
+          New-Item -ItemType Directory -Force -Path release-package
+          Copy-Item -Path "Game\publish\Magnus.exe" -Destination "release-package\" -Force
+          Copy-Item -Path "Game\publish\Magnus.exe.config" -Destination "release-package\" -ErrorAction SilentlyContinue
+          Copy-Item -Path "LICENSE" -Destination "release-package\" -ErrorAction SilentlyContinue
+          Copy-Item -Path "README.md" -Destination "release-package\" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "release-package\*" -DestinationPath "Magnus-Release.zip"
+        shell: pwsh
+      
+      - name: Determine release tag
+        id: get_tag
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "tag=${{ github.event.inputs.release_tag }}" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+        shell: pwsh
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: Magnus Chess ${{ steps.get_tag.outputs.tag }}
+          body: |
+            ## Magnus Chess Release ${{ steps.get_tag.outputs.tag }}
+            
+            A chess implementation written in Visual Basic .NET.
+            
+            ### Installation
+            1. Download `Magnus-Release.zip`
+            2. Extract the archive
+            3. Run `Magnus.exe`
+            
+            ### Requirements
+            - Windows operating system
+            - .NET Framework 4.7.2 or higher
+          files: |
+            Magnus-Release.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
