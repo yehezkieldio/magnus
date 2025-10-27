@@ -50,7 +50,7 @@ This repository includes a GitHub Actions workflow that automatically builds the
 Each release includes:
 - `Magnus-Release.zip` containing:
   - `Magnus.exe` - The compiled chess game executable
-  - `Magnus.exe.config` - Application configuration file
+  - `Magnus.exe.config` - Application configuration file (if present)
   - `LICENSE` - License information
   - `README.md` - Project documentation
 
